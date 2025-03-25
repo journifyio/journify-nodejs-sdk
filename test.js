@@ -1,12 +1,13 @@
-import Sinon, { spy, stub } from 'sinon'
+import Sinon from 'sinon'
 import bodyParser from 'body-parser'
 import express from 'express'
 import delay from 'delay'
-import auth from 'basic-auth'
+import assert from 'assert'
 import test from 'ava'
-import Journify from '.'
-import {LIB_VERSION} from './generated/libVersion'
+import Journify from './index.js'
+import {LIB_VERSION} from './generated/libVersion.js'
 
+const { spy, stub } = Sinon
 const noop = () => {}
 
 const context = {
@@ -32,7 +33,7 @@ const createClient = options => {
   return client
 }
 
-test.before.cb(t => {
+test.before(t => {
   let count = 0
   express()
     .use(bodyParser.json())
@@ -81,7 +82,9 @@ test('expose a constructor', t => {
 })
 
 test('require a write key', t => {
-  t.throws(() => new Journify(), 'You must pass your Journify source\'s write key.')
+  t.throws(() => new Journify(), {
+    message: 'You must pass your Journify source\'s write key.',
+  })
 })
 
 test('create a queue', t => {
