@@ -21,15 +21,11 @@ class Journify {
    *
    * @param {String} writeKey
    * @param {Object} [options] (optional)
-   *   @property {Number} [flushAt] (default: 20)
+   *   @property {Number} [flushAt] (default: 15)
    *   @property {Number} [flushInterval] (default: 10000)
    *   @property {String} [host] (default: 'https://t.journify.io')
    *   @property {Boolean} [enable] (default: true)
-   *   @property {Object} [axiosConfig] (optional)
-   *   @property {Object} [axiosInstance] (default: axios.create(options.axiosConfig))
-   *   @property {Object} [axiosRetryConfig] (optional)
    *   @property {Number} [retryCount] (default: 3)
-   *   @property {Function} [errorHandler] (optional)
    */
 
   constructor (writeKey, options) {
@@ -41,17 +37,12 @@ class Journify {
     this.writeKey = writeKey
     this.host = removeSlash(options.host || 'https://t.journify.io')
     this.path = removeSlash(options.path || '/v1/batch')
-    let axiosInstance = options.axiosInstance
-    if (axiosInstance == null) {
-      axiosInstance = axios.create(options.axiosConfig)
-    }
-    this.axiosInstance = axiosInstance
-    this.timeout = options.timeout || false
-    this.flushAt = Math.max(options.flushAt, 1) || 20
-    this.maxQueueSize = options.maxQueueSize || 1024 * 450 // 500kb is the API limit, if we approach the limit i.e., 450kb, we'll flush
+    this.axiosInstance = axios.create()
+    this.timeout = false
+    this.flushAt = options.flushAt || 15
     this.flushInterval = options.flushInterval || 10000
+    this.maxQueueSize = 1024 * 450 // 500kb is the API limit, if we approach the limit i.e., 450kb, we'll flush
     this.flushed = false
-    this.errorHandler = options.errorHandler
     this.pendingFlush = null
     Object.defineProperty(this, 'enable', {
       configurable: false,
@@ -63,7 +54,6 @@ class Journify {
       axiosRetry(this.axiosInstance, {
         retries: options.retryCount || 3,
         retryDelay: axiosRetry.exponentialDelay,
-        ...options.axiosRetryConfig,
         // retryCondition is below optional config to ensure it does not get overridden
         retryCondition: this._isErrorRetryable
       })
@@ -287,13 +277,9 @@ class Journify {
         return Promise.resolve(data)
       })
       .catch(err => {
-        if (typeof this.errorHandler === 'function') {
-          done(err)
-          return this.errorHandler(err)
-        }
 
         if (err.response) {
-          const error = new Error(err.response.statusText)
+          const error = new Error(`Status: ${err.response.statusText}, Data: ${err.response.data}`)
           done(error)
           throw error
         }
