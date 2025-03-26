@@ -2,13 +2,19 @@ import Sinon from 'sinon'
 import bodyParser from 'body-parser'
 import express from 'express'
 import delay from 'delay'
-import assert from 'assert'
+import axios from 'axios'
 import test from 'ava'
+import {registerCompletionHandler} from 'ava'
 import Journify from './index.js'
 import {LIB_VERSION} from './generated/libVersion.js'
 
+
+global.window = { document: { createElement: () => ({}) } };
+
 const { spy, stub } = Sinon
 const noop = () => {}
+
+registerCompletionHandler(() => process.exit())
 
 const context = {
   library: {
@@ -32,10 +38,10 @@ const createClient = options => {
 
   return client
 }
-
+let server;
 test.before(t => {
   let count = 0
-  express()
+  server = express()
     .use(bodyParser.json())
     .post('/v1/batch', (req, res) => {
       const {writeKey, batch } = req.body
@@ -76,6 +82,12 @@ test.before(t => {
 test.after(() => {
   Sinon.restore()
 })
+
+test.after('cleanup', t => {
+  if (server) {
+    server.close();
+  }
+});
 
 test('expose a constructor', t => {
   t.is(typeof Journify, 'function')
@@ -148,6 +160,8 @@ test('enqueue - add a message to the queue', t => {
     },
     callback: noop
   })
+
+  return
 })
 
 test('enqueue - stringify userId', t => {
@@ -308,7 +322,7 @@ test('enqueue - skip when client is disabled', async t => {
 test('flush - don\'t fail when queue is empty', async t => {
   const client = createClient()
 
-  await t.notThrows(client.flush())
+  await t.notThrowsAsync(client.flush())
 })
 
 test('flush - send messages', async t => {
@@ -355,7 +369,7 @@ test('flush - respond with an error', async t => {
     }
   ]
 
-  await t.throws(client.flush(), 'Bad Request')
+  await t.throwsAsync(client.flush(), {message: 'Bad Request'})
 })
 
 test('flush - do not throw on axios failure if errorHandler option is specified', async t => {
@@ -370,7 +384,7 @@ test('flush - do not throw on axios failure if errorHandler option is specified'
     }
   ]
 
-  await t.notThrows(client.flush())
+  await t.notThrowsAsync(client.flush())
   t.true(errorHandler.calledOnce)
 })
 
@@ -386,7 +400,7 @@ test('flush - evoke callback when errorHandler option is specified', async t => 
     }
   ]
 
-  await t.notThrows(client.flush())
+  await t.notThrowsAsync(client.flush())
   await delay(5)
   t.true(callback.calledOnce)
 })
@@ -402,7 +416,11 @@ test('flush - time out if configured', async t => {
     }
   ]
 
-  await t.throws(client.flush(), 'timeout of 500ms exceeded')
+  try{
+    await client.flush()
+  } catch (err) {
+    t.is(err.message, 'timeout of 500ms exceeded')
+  }
 })
 
 test('flush - skip when client is disabled', async t => {
@@ -468,8 +486,8 @@ test('identify - require a userId or anonymousId', t => {
   const client = createClient()
   stub(client, 'enqueue')
 
-  t.throws(() => client.identify(), 'You must pass a message object.')
-  t.throws(() => client.identify({}), 'You must pass either an "anonymousId" or a "userId".')
+  t.throws(() => client.identify(), {message: 'You must pass a message object.'})
+  t.throws(() => client.identify({}), {message:'You must pass either an "anonymousId" or a "userId".'})
   t.notThrows(() => client.identify({ userId: 'id' }))
   t.notThrows(() => client.identify({ anonymousId: 'id' }))
 })
@@ -493,10 +511,10 @@ test('group - require a groupId and either userId or anonymousId', t => {
   const client = createClient()
   stub(client, 'enqueue')
 
-  t.throws(() => client.group(), 'You must pass a message object.')
-  t.throws(() => client.group({}), 'You must pass either an "anonymousId" or a "userId".')
-  t.throws(() => client.group({ userId: 'id' }), 'You must pass a "groupId".')
-  t.throws(() => client.group({ anonymousId: 'id' }), 'You must pass a "groupId".')
+  t.throws(() => client.group(), {message: 'You must pass a message object.'})
+  t.throws(() => client.group({}), {message: 'You must pass either an "anonymousId" or a "userId".'})
+  t.throws(() => client.group({ userId: 'id' }), {message: 'You must pass a "groupId".'})
+  t.throws(() => client.group({ anonymousId: 'id' }),{message: 'You must pass a "groupId".'})
   t.notThrows(() => {
     client.group({
       groupId: 'id',
@@ -531,10 +549,10 @@ test('track - require event and either userId or anonymousId', t => {
   const client = createClient()
   stub(client, 'enqueue')
 
-  t.throws(() => client.track(), 'You must pass a message object.')
-  t.throws(() => client.track({}), 'You must pass either an "anonymousId" or a "userId".')
-  t.throws(() => client.track({ userId: 'id' }), 'You must pass an "event".')
-  t.throws(() => client.track({ anonymousId: 'id' }), 'You must pass an "event".')
+  t.throws(() => client.track(), {message: 'You must pass a message object.'})
+  t.throws(() => client.track({}), {message: 'You must pass either an "anonymousId" or a "userId".'})
+  t.throws(() => client.track({ userId: 'id' }), {message: 'You must pass an "event".'})
+  t.throws(() => client.track({ anonymousId: 'id' }), {message: 'You must pass an "event".'})
   t.notThrows(() => {
     client.track({
       userId: 'id',
@@ -565,8 +583,8 @@ test('page - require either userId or anonymousId', t => {
   const client = createClient()
   stub(client, 'enqueue')
 
-  t.throws(() => client.page(), 'You must pass a message object.')
-  t.throws(() => client.page({}), 'You must pass either an "anonymousId" or a "userId".')
+  t.throws(() => client.page(), {message: 'You must pass a message object.'})
+  t.throws(() => client.page({}), {message: 'You must pass either an "anonymousId" or a "userId".'})
   t.notThrows(() => client.page({ userId: 'id' }))
   t.notThrows(() => client.page({ anonymousId: 'id' }))
 })
@@ -586,8 +604,8 @@ test('screen - require either userId or anonymousId', t => {
   const client = createClient()
   stub(client, 'enqueue')
 
-  t.throws(() => client.screen(), 'You must pass a message object.')
-  t.throws(() => client.screen({}), 'You must pass either an "anonymousId" or a "userId".')
+  t.throws(() => client.screen(), {message: 'You must pass a message object.'})
+  t.throws(() => client.screen({}), {message: 'You must pass either an "anonymousId" or a "userId".'})
   t.notThrows(() => client.screen({ userId: 'id' }))
   t.notThrows(() => client.screen({ anonymousId: 'id' }))
 })
@@ -637,7 +655,7 @@ test('ensure that failed requests are retried', async t => {
     }
   ]
 
-  await t.notThrows(client.flush())
+  await t.notThrowsAsync(client.flush())
 })
 
 test('ensure that failed requests are not retried forever', async t => {
@@ -651,11 +669,10 @@ test('ensure that failed requests are not retried forever', async t => {
     }
   ]
 
-  await t.throws(client.flush())
+  await t.throwsAsync(client.flush())
 })
 
 test('ensure we can pass our own axios instance', async t => {
-  const axios = require('axios')
   const myAxiosInstance = axios.create()
   const stubAxiosPost = stub(myAxiosInstance, 'post').resolves()
   const client = createClient({
@@ -680,8 +697,6 @@ test('ensure we can pass our own axios instance', async t => {
 
 test('ensure other axios clients are not impacted by axios-retry', async t => {
   let client = createClient() // eslint-disable-line
-  const axios = require('axios')
-
   let callCounter = 0
 
   // Client will return a successful response for any requests beyond the first
