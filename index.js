@@ -10,6 +10,7 @@ const { v4: uuid } = require('uuid')
 const md5 = require('md5')
 const LIB_VERSION = require('./generated/libVersion').LIB_VERSION
 const isString = require('lodash.isstring')
+const { hashPII }  = require('./utils')
 
 const setImmediate = global.setImmediate || process.nextTick.bind(process)
 const noop = () => {}
@@ -25,6 +26,7 @@ class Journify {
    *   @property {Number} [flushInterval] (default: 10000)
    *   @property {String} [host] (default: 'https://t.journify.io')
    *   @property {Boolean} [enable] (default: true)
+   *   @property {Boolean} [enableHashing] (default: false)
    *   @property {Object} [axiosConfig] (optional)
    *   @property {Object} [axiosInstance] (default: axios.create(options.axiosConfig))
    *   @property {Object} [axiosRetryConfig] (optional)
@@ -53,6 +55,7 @@ class Journify {
     this.flushed = false
     this.errorHandler = options.errorHandler
     this.pendingFlush = null
+    this.enableHashing = options.enableHashing || false
     Object.defineProperty(this, 'enable', {
       configurable: false,
       writable: false,
@@ -77,14 +80,17 @@ class Journify {
   /**
    * Send an identify `message`.
    *
+   * @param {String} userId
    * @param {Object} message
    * @param {Function} [callback] (optional)
    * @return {Journify}
    */
 
-  identify (message, callback) {
-    this._validate(message, 'identify')
-    this.enqueue('identify', message, callback)
+  identify (userId, message, callback) {
+    assert(userId, 'You must pass a userId as the first argument.')
+    let event = { userId: userId, traits: message }
+    this._validate(event, 'identify')
+    this.enqueue('identify', event, callback)
     return this
   }
 
@@ -154,7 +160,7 @@ class Journify {
    * @api private
    */
 
-  enqueue (type, message, callback) {
+  async enqueue (type, message, callback) {
     callback = callback || noop
 
     if (!this.enable) {
@@ -163,6 +169,10 @@ class Journify {
 
     message = Object.assign({}, message)
     message.type = type
+    message.traits = message.traits || {}
+    if (this.enableHashing) {
+      message.traits = await hashPII(message.traits)
+    }
     message.context = Object.assign({
       library: {
         name: '@journifyio/nodejs-sdk',

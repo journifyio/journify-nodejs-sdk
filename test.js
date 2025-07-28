@@ -156,7 +156,8 @@ test('enqueue - add a message to the queue', t => {
       type: 'type',
       context,
       messageId: item.message.messageId,
-      writeKey: 'key'
+      writeKey: 'key',
+      traits: {}
     },
     callback: noop
   })
@@ -475,21 +476,22 @@ test('identify - enqueue a message', t => {
   const client = createClient()
   stub(client, 'enqueue')
 
-  const message = { userId: 'id' }
-  client.identify(message, noop)
+  const message = { email: 'test@email.com' }
+  client.identify('id', message, noop)
 
+  const expectedMessage = { traits: message, userId: 'id' }
   t.true(client.enqueue.calledOnce)
-  t.deepEqual(client.enqueue.firstCall.args, ['identify', message, noop])
+  t.deepEqual(client.enqueue.firstCall.args, ['identify', expectedMessage, noop])
 })
 
 test('identify - require a userId or anonymousId', t => {
   const client = createClient()
   stub(client, 'enqueue')
 
-  t.throws(() => client.identify(), {message: 'You must pass a message object.'})
-  t.throws(() => client.identify({}), {message:'You must pass either an "anonymousId" or a "userId".'})
-  t.notThrows(() => client.identify({ userId: 'id' }))
-  t.notThrows(() => client.identify({ anonymousId: 'id' }))
+  t.throws(() => client.identify(), {message: 'You must pass a userId as the first argument.'})
+  t.throws(() => client.identify({}), {message:'"userId" must be a string or number.'})
+  t.notThrows(() => client.identify('id', { userId: 'id' }))
+  t.notThrows(() => client.identify('id', { anonymousId: 'id' }))
 })
 
 test('group - enqueue a message', t => {
