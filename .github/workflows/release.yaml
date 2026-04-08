@@ -45,10 +45,7 @@ jobs:
 
       - name: Publish
         if: steps.release_check.outputs.new_release == 'true'
-        uses: JS-DevTools/npm-publish@v1
-        with:
-          token: ${{ secrets.NPM_TOKEN }}
-          access: public
+        run: npm publish --access public --provenance
 
       - name: Release to Github
         if: steps.release_check.outputs.new_release == 'true'
