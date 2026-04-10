@@ -1,9 +1,12 @@
 {
   "name": "@journifyio/nodejs-sdk",
-  "version": "6.2.5",
+  "version": "6.2.6",
   "description": "Journify SDK in Node.js",
   "license": "MIT",
-  "repository": "git@github.com:journifyio/journify-nodejs-sdk.git",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/journifyio/journify-nodejs-sdk.git"
+  },
   "homepage": "https://github.com/journifyio/journify-nodejs-sdk",
   "author": "Journifyio",
   "engines": {
